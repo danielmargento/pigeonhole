@@ -103,7 +103,7 @@ export default function AdminCoursesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {courses.map((c) => (
-            <CourseCard key={c.id} course={c} basePath="/admin/course" />
+            <CourseCard key={c.id} course={c} basePath="/admin/course" showClassCode />
           ))}
         </div>
       )}

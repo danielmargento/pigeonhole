@@ -29,6 +29,27 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Validate student is enrolled in the course
+  const { data: enrollment } = await supabase
+    .from("enrollments")
+    .select("id")
+    .eq("course_id", body.course_id)
+    .eq("student_id", user.id)
+    .single();
+
+  if (!enrollment) {
+    // Also allow course owners (instructors) to create sessions
+    const { data: course } = await supabase
+      .from("courses")
+      .select("owner_id")
+      .eq("id", body.course_id)
+      .single();
+
+    if (!course || course.owner_id !== user.id) {
+      return NextResponse.json({ error: "Not enrolled in this course" }, { status: 403 });
+    }
+  }
+
   const { data, error } = await supabase
     .from("sessions")
     .insert({

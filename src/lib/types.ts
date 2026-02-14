@@ -3,7 +3,15 @@ export interface Course {
   name: string;
   code: string;
   description: string;
+  class_code: string;
   created_at: string;
+}
+
+export interface Enrollment {
+  id: string;
+  course_id: string;
+  student_id: string;
+  enrolled_at: string;
 }
 
 export interface Assignment {

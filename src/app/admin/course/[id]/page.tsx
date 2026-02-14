@@ -22,6 +22,18 @@ export default function AdminCoursePage() {
   const [saving, setSaving] = useState(false);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [insights, setInsights] = useState<UsageInsight | null>(null);
+  const [classCode, setClassCode] = useState("");
+
+  // Load course info (for class code)
+  useEffect(() => {
+    fetch("/api/courses")
+      .then((r) => r.json())
+      .then((courses) => {
+        const course = courses.find((c: { id: string }) => c.id === courseId);
+        if (course) setClassCode(course.class_code ?? "");
+      })
+      .catch(() => {});
+  }, [courseId]);
 
   // Load bot config on mount
   useEffect(() => {
@@ -90,6 +102,18 @@ export default function AdminCoursePage() {
         <div>
           <h1 className="text-xl font-bold text-foreground">Course Configuration</h1>
           <p className="text-sm text-muted mt-1">Configure your TA bot&apos;s behavior and policies.</p>
+          {classCode && (
+            <p className="text-sm text-muted mt-1">
+              Join code:{" "}
+              <button
+                onClick={() => navigator.clipboard.writeText(classCode)}
+                className="font-mono font-semibold text-foreground hover:text-accent transition-colors cursor-pointer"
+                title="Click to copy"
+              >
+                {classCode}
+              </button>
+            </p>
+          )}
         </div>
         <button
           onClick={handleSave}

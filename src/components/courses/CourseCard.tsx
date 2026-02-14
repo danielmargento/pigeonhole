@@ -6,9 +6,10 @@ import { Course } from "@/lib/types";
 interface Props {
   course: Course;
   basePath: string;
+  showClassCode?: boolean;
 }
 
-export default function CourseCard({ course, basePath }: Props) {
+export default function CourseCard({ course, basePath, showClassCode }: Props) {
   return (
     <Link
       href={`${basePath}/${course.id}`}
@@ -27,6 +28,11 @@ export default function CourseCard({ course, basePath }: Props) {
       </div>
       {course.description && (
         <p className="text-sm text-muted mt-2 line-clamp-2">{course.description}</p>
+      )}
+      {showClassCode && course.class_code && (
+        <p className="text-xs text-muted mt-3">
+          Join code: <span className="font-mono font-semibold text-foreground">{course.class_code}</span>
+        </p>
       )}
     </Link>
   );
