@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useUser } from "@/hooks/useUser";
 
 export default function HomePage() {
-  const router = useRouter();
   const { user, role, loading } = useUser();
 
   if (loading) {

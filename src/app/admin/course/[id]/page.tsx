@@ -143,6 +143,9 @@ export default function AdminCoursePage() {
       <div className="bg-surface border border-border rounded-lg p-6">
         {activeTab === "policy" && (
           <div className="space-y-6">
+            <p className="text-xs text-muted">
+              These are the default guardrails for your course. Individual assignments can override these settings.
+            </p>
             <StylePresetSelect value={stylePreset} onChange={setStylePreset} />
             <hr className="border-border" />
             <PolicyEditor policy={policy} onChange={setPolicy} />
@@ -157,21 +160,32 @@ export default function AdminCoursePage() {
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-foreground">Existing Assignments</h3>
                 {assignments.map((a) => (
-                  <div key={a.id} className="p-3 bg-background border border-border rounded text-sm flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <span className="font-medium text-foreground">{a.title}</span>
-                      <p className="text-muted text-xs mt-0.5">{a.prompt.slice(0, 100)}{a.prompt.length > 100 ? "..." : ""}</p>
+                  <div key={a.id} className="p-3 bg-background border border-border rounded text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="font-medium text-foreground">{a.title}</span>
+                        <p className="text-muted text-xs mt-0.5">{a.prompt.slice(0, 100)}{a.prompt.length > 100 ? "..." : ""}</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Delete "${a.title}"?`)) return;
+                          const res = await fetch(`/api/assignments?id=${a.id}`, { method: "DELETE" });
+                          if (res.ok) setAssignments((prev) => prev.filter((x) => x.id !== a.id));
+                        }}
+                        className="text-xs text-muted hover:text-red-500 transition-colors shrink-0"
+                      >
+                        Delete
+                      </button>
                     </div>
-                    <button
-                      onClick={async () => {
-                        if (!confirm(`Delete "${a.title}"?`)) return;
-                        const res = await fetch(`/api/assignments?id=${a.id}`, { method: "DELETE" });
-                        if (res.ok) setAssignments((prev) => prev.filter((x) => x.id !== a.id));
-                      }}
-                      className="text-xs text-muted hover:text-red-500 transition-colors shrink-0"
-                    >
-                      Delete
-                    </button>
+                    {a.overrides && Object.keys(a.overrides).length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {Object.entries(a.overrides).map(([key, val]) => (
+                          <span key={key} className="text-[10px] px-1.5 py-0.5 rounded bg-accent-light text-accent">
+                            {key.replace(/_/g, " ")}: {String(val)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
                 <hr className="border-border" />

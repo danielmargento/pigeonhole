@@ -63,22 +63,27 @@ export async function POST(req: NextRequest) {
     assignment = data;
   }
 
+  // Merge assignment-level policy overrides into course-level policy
+  const effectivePolicy = assignment?.overrides
+    ? { ...config.policy, ...assignment.overrides }
+    : config.policy;
+
   // Check policy — disallowed artifacts
-  const policyCheck = isDisallowedRequest(message, config.policy);
+  const policyCheck = isDisallowedRequest(message, effectivePolicy);
   if (policyCheck.blocked) {
     return NextResponse.json({ role: "assistant", content: policyCheck.reason });
   }
 
   // Check policy — topic gates
-  if (config.policy.topic_gates && config.policy.topic_gates.length > 0) {
+  if (effectivePolicy.topic_gates && effectivePolicy.topic_gates.length > 0) {
     const lowerMessage = message.toLowerCase();
-    for (const gate of config.policy.topic_gates) {
+    for (const gate of effectivePolicy.topic_gates) {
       if (lowerMessage.includes(gate.topic.toLowerCase())) {
-        const result = checkTopicGate(gate.topic, config.policy.topic_gates);
+        const result = checkTopicGate(gate.topic, effectivePolicy.topic_gates);
         if (result.gated) {
           return NextResponse.json({
             role: "assistant",
-            content: result.gate?.message || config.policy.refusal_message,
+            content: result.gate?.message || effectivePolicy.refusal_message,
           });
         }
       }
@@ -93,7 +98,8 @@ export async function POST(req: NextRequest) {
     .order("created_at", { ascending: true })
     .returns<Message[]>();
 
-  const systemPrompt = buildSystemPrompt(course, config, assignment);
+  const effectiveConfig = { ...config, policy: effectivePolicy };
+  const systemPrompt = buildSystemPrompt(course, effectiveConfig, assignment);
 
   const chatMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
