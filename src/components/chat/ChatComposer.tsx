@@ -18,7 +18,7 @@ export default function ChatComposer({ onSend, disabled }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2 p-3 border-t border-border bg-surface">
+    <form onSubmit={handleSubmit} className="flex gap-2 min-w-0 flex-1">
       <textarea
         className="flex-1 border border-border rounded px-3 py-2 text-sm resize-none focus:outline-none focus:border-accent bg-background"
         rows={2}
