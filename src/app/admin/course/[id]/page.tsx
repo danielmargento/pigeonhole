@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AssignmentPayload } from "@/components/admin/AssignmentEditor";
 import MaterialsPanel from "@/components/admin/MaterialsPanel";
 import AssignmentEditor from "@/components/admin/AssignmentEditor";
 import InsightsPanel from "@/components/admin/InsightsPanel";
@@ -17,6 +18,7 @@ export default function AdminCoursePage() {
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [insights, setInsights] = useState<UsageInsight | null>(null);
   const [classCode, setClassCode] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [newAnnouncement, setNewAnnouncement] = useState("");
   const [posting, setPosting] = useState(false);
@@ -169,51 +171,102 @@ export default function AdminCoursePage() {
         {activeTab === "assignments" && (
           <div className="space-y-6">
             {assignments.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <h3 className="text-sm font-medium text-foreground">Existing Assignments</h3>
-                {assignments.map((a) => (
-                  <div key={a.id} className="p-3 bg-background border border-border rounded text-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <span className="font-medium text-foreground">{a.title}</span>
-                        {a.due_date && (
-                          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-accent-light text-accent">
-                            Due {new Date(a.due_date).toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        onClick={async () => {
-                          if (!confirm(`Delete "${a.title}"?`)) return;
-                          const res = await fetch(`/api/assignments?id=${a.id}`, { method: "DELETE" });
-                          if (res.ok) setAssignments((prev) => prev.filter((x) => x.id !== a.id));
+                {assignments.map((a) =>
+                  editingId === a.id ? (
+                    <div key={a.id} className="p-4 bg-background border border-accent/40 rounded-lg">
+                      <h4 className="text-sm font-medium text-foreground mb-3">Editing: {a.title}</h4>
+                      <AssignmentEditor
+                        materials={materials}
+                        existing={a}
+                        onSave={async (payload: AssignmentPayload) => {
+                          const res = await fetch("/api/assignments", {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: a.id, ...payload }),
+                          });
+                          if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            alert(`Failed to update assignment: ${err.error || "Unknown error"}`);
+                            return;
+                          }
+                          const updated = await res.json();
+                          setAssignments((prev) => prev.map((x) => (x.id === a.id ? updated : x)));
+                          setEditingId(null);
                         }}
-                        className="text-xs text-muted hover:text-red-500 transition-colors shrink-0"
-                      >
-                        Delete
-                      </button>
+                        onCancel={() => setEditingId(null)}
+                      />
                     </div>
-                  </div>
-                ))}
+                  ) : (
+                    <div
+                      key={a.id}
+                      className="p-4 bg-background border border-border rounded-lg hover:border-accent/40 transition-colors cursor-pointer"
+                      onClick={() => setEditingId(a.id)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="font-medium text-foreground">{a.title}</span>
+                          {a.due_date && (
+                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-accent-light text-accent">
+                              Due {new Date(a.due_date).toLocaleString()}
+                            </span>
+                          )}
+                          <div className="flex gap-3 mt-1.5 text-[11px] text-muted">
+                            <span>
+                              {a.overrides?.hint_levels === 1
+                                ? "Strict"
+                                : a.overrides?.hint_levels === 5
+                                  ? "Full support"
+                                  : "Guided"}
+                            </span>
+                            {a.material_ids?.length > 0 && (
+                              <span>{a.material_ids.length} material{a.material_ids.length !== 1 ? "s" : ""}</span>
+                            )}
+                            {a.staff_notes && <span>Has staff notes</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-accent">Edit</span>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm(`Delete "${a.title}"?`)) return;
+                              const res = await fetch(`/api/assignments?id=${a.id}`, { method: "DELETE" });
+                              if (res.ok) setAssignments((prev) => prev.filter((x) => x.id !== a.id));
+                            }}
+                            className="text-xs text-muted hover:text-red-500 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                )}
                 <hr className="border-border" />
               </div>
             )}
-            <AssignmentEditor
-              materials={materials}
-              onSave={(a) => {
-                fetch("/api/assignments", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ ...a, course_id: courseId }),
-                }).then(() => {
-                  fetch(`/api/assignments?course_id=${courseId}`)
-                    .then((r) => r.json())
-                    .then((data) => {
-                      if (Array.isArray(data)) setAssignments(data);
-                    });
-                });
-              }}
-            />
+            <div>
+              <h3 className="text-sm font-medium text-foreground mb-3">New Assignment</h3>
+              <AssignmentEditor
+                materials={materials}
+                onSave={async (a: AssignmentPayload) => {
+                  const res = await fetch("/api/assignments", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ...a, course_id: courseId }),
+                  });
+                  if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    alert(`Failed to create assignment: ${err.error || "Unknown error"}`);
+                    return;
+                  }
+                  const created = await res.json();
+                  setAssignments((prev) => [created, ...prev]);
+                }}
+              />
+            </div>
           </div>
         )}
         {activeTab === "announcements" && (

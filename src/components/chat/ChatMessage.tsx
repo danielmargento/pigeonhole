@@ -1,5 +1,10 @@
 "use client";
 
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import remarkGfm from "remark-gfm";
+import "katex/dist/katex.min.css";
 import { Message } from "@/lib/types";
 import SaveToggle from "./SaveToggle";
 
@@ -21,7 +26,18 @@ export default function ChatMessage({ message, onToggleSave, onFeedback }: Props
             : "bg-surface border border-border text-foreground"
         }`}
       >
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+        {isUser ? (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+        ) : (
+          <div className="prose prose-sm max-w-none text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+            <ReactMarkdown
+              remarkPlugins={[remarkMath, remarkGfm]}
+              rehypePlugins={[rehypeKatex]}
+            >
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        )}
         {!isUser && (
           <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border text-xs text-muted">
             <SaveToggle

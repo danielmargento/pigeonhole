@@ -1,17 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CourseMaterial, PolicyConfig } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
+import { Assignment, CourseMaterial, PolicyConfig } from "@/lib/types";
+
+export interface AssignmentPayload {
+  title: string;
+  staff_notes: string;
+  due_date: string | null;
+  overrides: Partial<PolicyConfig> | null;
+  material_ids: string[];
+}
 
 interface Props {
   materials?: CourseMaterial[];
-  onSave: (assignment: {
-    title: string;
-    staff_notes: string;
-    due_date: string | null;
-    overrides: Partial<PolicyConfig> | null;
-    material_ids: string[];
-  }) => void;
+  existing?: Assignment | null;
+  onSave: (assignment: AssignmentPayload) => void;
+  onCancel?: () => void;
 }
 
 const helpLevelOptions = [
@@ -32,15 +36,31 @@ const helpLevelOptions = [
   },
 ];
 
-export default function AssignmentEditor({ materials = [], onSave }: Props) {
+function toLocalDatetime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export default function AssignmentEditor({ materials = [], existing, onSave, onCancel }: Props) {
+  const isEdit = !!existing;
+
   const [title, setTitle] = useState("");
   const [staffNotes, setStaffNotes] = useState("");
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState("");
   const [helpLevel, setHelpLevel] = useState(3);
-  const [refusalMessage, setRefusalMessage] = useState(
-    "I can't provide that directly, but I can help guide you toward the answer. Can you share what you've tried so far?"
-  );
+
+  // Pre-fill when editing
+  useEffect(() => {
+    if (existing) {
+      setTitle(existing.title);
+      setStaffNotes(existing.staff_notes || "");
+      setSelectedMaterialIds(existing.material_ids || []);
+      setDueDate(existing.due_date ? toLocalDatetime(existing.due_date) : "");
+      setHelpLevel(existing.overrides?.hint_levels ?? 3);
+    }
+  }, [existing]);
 
   // Group materials by category
   const materialsByCategory = useMemo(() => {
@@ -56,7 +76,6 @@ export default function AssignmentEditor({ materials = [], onSave }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const selectedOpt = helpLevelOptions.find((o) => o.value === helpLevel)!;
     const allowAnswers = helpLevel === 5;
 
     const overrides: Partial<PolicyConfig> = {
@@ -65,9 +84,6 @@ export default function AssignmentEditor({ materials = [], onSave }: Props) {
       require_attempt_first: helpLevel < 5,
       hint_levels: helpLevel,
     };
-    if (refusalMessage.trim()) {
-      overrides.refusal_message = refusalMessage.trim();
-    }
 
     onSave({
       title,
@@ -76,12 +92,14 @@ export default function AssignmentEditor({ materials = [], onSave }: Props) {
       overrides,
       material_ids: selectedMaterialIds,
     });
-    setTitle("");
-    setStaffNotes("");
-    setSelectedMaterialIds([]);
-    setDueDate("");
-    setHelpLevel(3);
-    setRefusalMessage("I can't provide that directly, but I can help guide you toward the answer. Can you share what you've tried so far?");
+
+    if (!isEdit) {
+      setTitle("");
+      setStaffNotes("");
+      setSelectedMaterialIds([]);
+      setDueDate("");
+      setHelpLevel(3);
+    }
   };
 
   return (
@@ -93,18 +111,6 @@ export default function AssignmentEditor({ materials = [], onSave }: Props) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
-        />
-      </div>
-
-      <div>
-        <label className="text-xs font-medium text-muted block mb-1">
-          Staff Notes <span className="text-muted/60">(hidden from students)</span>
-        </label>
-        <textarea
-          className="border border-border rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent bg-background"
-          rows={3}
-          value={staffNotes}
-          onChange={(e) => setStaffNotes(e.target.value)}
         />
       </div>
 
@@ -212,23 +218,43 @@ export default function AssignmentEditor({ materials = [], onSave }: Props) {
           ))}
         </div>
 
-        <div className="pt-1">
-          <label className="text-sm text-muted block mb-1">Refusal message</label>
-          <textarea
-            className="border border-border rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent bg-background"
-            rows={2}
-            value={refusalMessage}
-            onChange={(e) => setRefusalMessage(e.target.value)}
-          />
-        </div>
       </div>
 
-      <button
-        type="submit"
-        className="bg-accent text-white px-4 py-2 rounded text-sm font-medium hover:bg-accent-hover transition-colors"
-      >
-        Add Assignment
-      </button>
+      <hr className="border-border" />
+
+      {/* Staff Notes */}
+      <div>
+        <label className="text-xs font-medium text-muted block mb-1">
+          Staff Notes <span className="text-muted/60">(private, never shown to students)</span>
+        </label>
+        <p className="text-[10px] text-muted mb-2">
+          Add any extra instructions or context for the bot. These shape how it responds but are never revealed to students.
+        </p>
+        <textarea
+          className="border border-border rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent bg-background"
+          rows={4}
+          value={staffNotes}
+          onChange={(e) => setStaffNotes(e.target.value)}
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          className="bg-accent text-white px-4 py-2 rounded text-sm font-medium hover:bg-accent-hover transition-colors"
+        >
+          {isEdit ? "Save Changes" : "Add Assignment"}
+        </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 rounded text-sm font-medium text-muted hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   );
 }

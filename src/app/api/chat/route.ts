@@ -119,7 +119,6 @@ export async function POST(req: NextRequest) {
   const effectiveConfig = {
     ...config,
     policy: effectivePolicy,
-    style_preset: assignment?.style_preset ?? config.style_preset,
   };
   const systemPrompt = buildSystemPrompt(course, effectiveConfig, assignment, materials);
 

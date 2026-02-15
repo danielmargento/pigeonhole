@@ -51,6 +51,51 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data);
 }
 
+export async function PATCH(req: NextRequest) {
+  const body = await req.json();
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (!body.id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+  // Verify instructor owns the course
+  const { data: existing } = await supabase
+    .from("assignments")
+    .select("course_id")
+    .eq("id", body.id)
+    .single();
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const { data: course } = await supabase
+    .from("courses")
+    .select("owner_id")
+    .eq("id", existing.course_id)
+    .single();
+  if (!course || course.owner_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (body.title !== undefined) updates.title = body.title;
+  if (body.staff_notes !== undefined) updates.staff_notes = body.staff_notes;
+  if (body.due_date !== undefined) updates.due_date = body.due_date;
+  if (body.overrides !== undefined) updates.overrides = body.overrides;
+  if (body.material_ids !== undefined) updates.material_ids = body.material_ids;
+
+  const { data, error } = await supabase
+    .from("assignments")
+    .update(updates)
+    .eq("id", body.id)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const supabase = await createServerClient();
@@ -77,7 +122,6 @@ export async function POST(req: NextRequest) {
       prompt: body.prompt ?? "",
       staff_notes: body.staff_notes ?? "",
       faq: body.faq ?? [],
-      style_preset: body.style_preset ?? "socratic",
       due_date: body.due_date ?? null,
       overrides: body.overrides ?? null,
       material_ids: body.material_ids ?? [],
