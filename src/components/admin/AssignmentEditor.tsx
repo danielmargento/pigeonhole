@@ -1,36 +1,46 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CourseMaterial, PolicyConfig, StylePreset } from "@/lib/types";
-import { stylePresets } from "@/config/stylePresets";
+import { CourseMaterial, PolicyConfig } from "@/lib/types";
 
 interface Props {
   materials?: CourseMaterial[];
   onSave: (assignment: {
     title: string;
-    prompt: string;
     staff_notes: string;
-    faq: string[];
-    style_preset: StylePreset;
+    due_date: string | null;
     overrides: Partial<PolicyConfig> | null;
     material_ids: string[];
   }) => void;
 }
 
+const helpLevelOptions = [
+  {
+    value: 1,
+    label: "Strict",
+    description: "No direct answers. Only confirms if the student is on the right track.",
+  },
+  {
+    value: 3,
+    label: "Guided",
+    description: "Step-by-step hints that lead toward the answer without giving it away.",
+  },
+  {
+    value: 5,
+    label: "Full support",
+    description: "Will explain everything, including worked examples, after enough effort.",
+  },
+];
+
 export default function AssignmentEditor({ materials = [], onSave }: Props) {
   const [title, setTitle] = useState("");
-  const [prompt, setPrompt] = useState("");
   const [staffNotes, setStaffNotes] = useState("");
-  const [faq, setFaq] = useState("");
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
-  const [stylePreset, setStylePreset] = useState<StylePreset>("socratic");
-
-  // Policy controls
-  const [allowFinalAnswers, setAllowFinalAnswers] = useState(false);
-  const [allowFullCode, setAllowFullCode] = useState(false);
-  const [requireAttemptFirst, setRequireAttemptFirst] = useState(true);
-  const [hintLevels, setHintLevels] = useState(3);
-  const [refusalMessage, setRefusalMessage] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [helpLevel, setHelpLevel] = useState(3);
+  const [refusalMessage, setRefusalMessage] = useState(
+    "I can't provide that directly, but I can help guide you toward the answer. Can you share what you've tried so far?"
+  );
 
   // Group materials by category
   const materialsByCategory = useMemo(() => {
@@ -46,11 +56,14 @@ export default function AssignmentEditor({ materials = [], onSave }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const selectedOpt = helpLevelOptions.find((o) => o.value === helpLevel)!;
+    const allowAnswers = helpLevel === 5;
+
     const overrides: Partial<PolicyConfig> = {
-      allow_final_answers: allowFinalAnswers,
-      allow_full_code: allowFullCode,
-      require_attempt_first: requireAttemptFirst,
-      hint_levels: hintLevels,
+      allow_final_answers: allowAnswers,
+      allow_full_code: allowAnswers,
+      require_attempt_first: helpLevel < 5,
+      hint_levels: helpLevel,
     };
     if (refusalMessage.trim()) {
       overrides.refusal_message = refusalMessage.trim();
@@ -58,24 +71,17 @@ export default function AssignmentEditor({ materials = [], onSave }: Props) {
 
     onSave({
       title,
-      prompt,
       staff_notes: staffNotes,
-      faq: faq.split("\n").map((l) => l.trim()).filter(Boolean),
-      style_preset: stylePreset,
+      due_date: dueDate ? new Date(dueDate).toISOString() : null,
       overrides,
       material_ids: selectedMaterialIds,
     });
     setTitle("");
-    setPrompt("");
     setStaffNotes("");
-    setFaq("");
     setSelectedMaterialIds([]);
-    setStylePreset("socratic");
-    setAllowFinalAnswers(false);
-    setAllowFullCode(false);
-    setRequireAttemptFirst(true);
-    setHintLevels(3);
-    setRefusalMessage("");
+    setDueDate("");
+    setHelpLevel(3);
+    setRefusalMessage("I can't provide that directly, but I can help guide you toward the answer. Can you share what you've tried so far?");
   };
 
   return (
@@ -90,38 +96,6 @@ export default function AssignmentEditor({ materials = [], onSave }: Props) {
         />
       </div>
 
-      {/* Style Preset */}
-      <div>
-        <label className="text-xs font-medium text-muted block mb-1">Teaching Style</label>
-        <div className="grid grid-cols-2 gap-2">
-          {stylePresets.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => setStylePreset(p.key)}
-              className={`text-left border rounded-lg p-3 transition-all text-sm ${
-                stylePreset === p.key
-                  ? "border-accent bg-accent-light"
-                  : "border-border hover:border-accent/40"
-              }`}
-            >
-              <span className="font-medium text-foreground">{p.label}</span>
-              <p className="text-xs text-muted mt-0.5">{p.description}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label className="text-xs font-medium text-muted block mb-1">Prompt</label>
-        <textarea
-          className="border border-border rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent bg-background"
-          rows={4}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          required
-        />
-      </div>
       <div>
         <label className="text-xs font-medium text-muted block mb-1">
           Staff Notes <span className="text-muted/60">(hidden from students)</span>
@@ -133,14 +107,19 @@ export default function AssignmentEditor({ materials = [], onSave }: Props) {
           onChange={(e) => setStaffNotes(e.target.value)}
         />
       </div>
+
+      {/* Due Date */}
       <div>
-        <label className="text-xs font-medium text-muted block mb-1">FAQ (one per line)</label>
-        <textarea
+        <label className="text-xs font-medium text-muted block mb-1">Due Date</label>
+        <input
+          type="datetime-local"
           className="border border-border rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent bg-background"
-          rows={3}
-          value={faq}
-          onChange={(e) => setFaq(e.target.value)}
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
         />
+        <p className="text-[10px] text-muted mt-1">
+          Times are in your local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone})
+        </p>
       </div>
 
       {/* Materials selector grouped by category */}
@@ -201,58 +180,45 @@ export default function AssignmentEditor({ materials = [], onSave }: Props) {
         </div>
       )}
 
-      {/* Policy Controls */}
-      <div className="border border-border rounded-lg p-4 bg-background space-y-3">
-        <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide">Policy</h4>
-        <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-          <input
-            type="checkbox"
-            checked={allowFinalAnswers}
-            onChange={(e) => setAllowFinalAnswers(e.target.checked)}
-            className="accent-accent"
-          />
-          Allow final answers
-        </label>
-        <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-          <input
-            type="checkbox"
-            checked={allowFullCode}
-            onChange={(e) => setAllowFullCode(e.target.checked)}
-            className="accent-accent"
-          />
-          Allow full code solutions
-        </label>
-        <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-          <input
-            type="checkbox"
-            checked={requireAttemptFirst}
-            onChange={(e) => setRequireAttemptFirst(e.target.checked)}
-            className="accent-accent"
-          />
-          Require student attempt first
-        </label>
-        <div>
-          <label className="text-xs text-muted block mb-1">Hint levels</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="range"
-              min={1}
-              max={5}
-              value={hintLevels}
-              onChange={(e) => setHintLevels(parseInt(e.target.value))}
-              className="flex-1 accent-accent"
-            />
-            <span className="text-xs text-foreground font-medium w-4">{hintLevels}</span>
-          </div>
+      <hr className="border-border" />
+
+      {/* Guardrails & Policy */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-semibold text-foreground">Guardrails & Policy</h4>
+
+        <div className="space-y-2">
+          <p className="text-sm text-muted">How much help should the bot give?</p>
+          {helpLevelOptions.map((opt) => (
+            <label
+              key={opt.value}
+              className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                helpLevel === opt.value
+                  ? "bg-accent-light border border-accent"
+                  : "hover:bg-background border border-transparent"
+              }`}
+            >
+              <input
+                type="radio"
+                name="helpLevel"
+                checked={helpLevel === opt.value}
+                onChange={() => setHelpLevel(opt.value)}
+                className="accent-accent mt-0.5"
+              />
+              <div>
+                <span className="text-sm font-medium text-foreground">{opt.label}</span>
+                <p className="text-xs text-muted">{opt.description}</p>
+              </div>
+            </label>
+          ))}
         </div>
-        <div>
-          <label className="text-xs text-muted block mb-1">Refusal message</label>
+
+        <div className="pt-1">
+          <label className="text-sm text-muted block mb-1">Refusal message</label>
           <textarea
             className="border border-border rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent bg-background"
             rows={2}
             value={refusalMessage}
             onChange={(e) => setRefusalMessage(e.target.value)}
-            placeholder="Custom message when the bot declines to answer..."
           />
         </div>
       </div>

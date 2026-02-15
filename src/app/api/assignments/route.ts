@@ -74,10 +74,11 @@ export async function POST(req: NextRequest) {
     .insert({
       course_id: body.course_id,
       title: body.title,
-      prompt: body.prompt,
+      prompt: body.prompt ?? "",
       staff_notes: body.staff_notes ?? "",
       faq: body.faq ?? [],
       style_preset: body.style_preset ?? "socratic",
+      due_date: body.due_date ?? null,
       overrides: body.overrides ?? null,
       material_ids: body.material_ids ?? [],
     })

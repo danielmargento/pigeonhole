@@ -22,6 +22,7 @@ export interface Assignment {
   staff_notes: string;
   faq: string[];
   style_preset: StylePreset;
+  due_date: string | null;
   overrides: Partial<PolicyConfig> | null;
   material_ids: string[];
   created_at: string;

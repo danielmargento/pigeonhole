@@ -273,12 +273,37 @@ export default function StudentCoursePage() {
         </div>
         <ExportButton messages={savedMessages} title="Saved Messages" />
       </div>
-      <div className="flex-1 flex flex-col bg-surface border border-border rounded-lg overflow-hidden">
+      <div className="flex-1 flex flex-col bg-surface border border-border rounded-lg overflow-hidden relative">
         <ChatWindow
           messages={messages}
           onToggleSave={handleToggleSave}
           onFeedback={handleFeedback}
         />
+        {selectedAssignment && (() => {
+          const assignment = assignments.find((a) => a.id === selectedAssignment);
+          if (!assignment?.due_date) return null;
+          const due = new Date(assignment.due_date);
+          const now = new Date();
+          const isPast = due < now;
+          return (
+            <div
+              className={`px-3 py-1.5 text-xs font-medium text-center border-t border-border ${
+                isPast
+                  ? "bg-red-50 text-red-600"
+                  : "bg-amber-50 text-amber-700 animate-pulse"
+              }`}
+            >
+              {isPast ? "Past due" : "Due"}: {due.toLocaleString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+                timeZoneName: "short",
+              })}
+            </div>
+          );
+        })()}
         <ChatComposer onSend={handleSend} disabled={streaming} />
       </div>
     </div>

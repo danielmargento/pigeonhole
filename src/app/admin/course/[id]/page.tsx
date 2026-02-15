@@ -176,10 +176,11 @@ export default function AdminCoursePage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <span className="font-medium text-foreground">{a.title}</span>
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-accent-light text-accent">
-                          {a.style_preset}
-                        </span>
-                        <p className="text-muted text-xs mt-0.5">{a.prompt.slice(0, 100)}{a.prompt.length > 100 ? "..." : ""}</p>
+                        {a.due_date && (
+                          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-accent-light text-accent">
+                            Due {new Date(a.due_date).toLocaleString()}
+                          </span>
+                        )}
                       </div>
                       <button
                         onClick={async () => {
@@ -192,15 +193,6 @@ export default function AdminCoursePage() {
                         Delete
                       </button>
                     </div>
-                    {a.overrides && Object.keys(a.overrides).length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {Object.entries(a.overrides).map(([key, val]) => (
-                          <span key={key} className="text-[10px] px-1.5 py-0.5 rounded bg-accent-light text-accent">
-                            {key.replace(/_/g, " ")}: {String(val)}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
                 <hr className="border-border" />
