@@ -9,18 +9,27 @@ function getOpenAI() {
 /**
  * Generate LLM-powered insight summaries from student messages.
  * Results are cached in course_insights_cache for 1 hour.
+ * When assignmentId is provided, insights are scoped to that assignment.
  */
 export async function generateLLMInsights(
   supabase: SupabaseClient,
   courseId: string,
-  userMessages: Message[]
+  userMessages: Message[],
+  assignmentId?: string | null
 ): Promise<LLMInsightSummary | null> {
-  // Check cache first
-  const { data: cached } = await supabase
+  // Check cache first — match on course + assignment
+  let cacheQuery = supabase
     .from("course_insights_cache")
     .select("insights, generated_at")
-    .eq("course_id", courseId)
-    .single();
+    .eq("course_id", courseId);
+
+  if (assignmentId) {
+    cacheQuery = cacheQuery.eq("assignment_id", assignmentId);
+  } else {
+    cacheQuery = cacheQuery.is("assignment_id", null);
+  }
+
+  const { data: cached } = await cacheQuery.single();
 
   if (cached) {
     const age = Date.now() - new Date(cached.generated_at).getTime();
@@ -40,12 +49,18 @@ export async function generateLLMInsights(
     .map((m, i) => `${i + 1}. ${m.content}`)
     .join("\n");
 
+  const scopeNote = assignmentId
+    ? "These are student questions for a SPECIFIC assignment. Focus your analysis on patterns within this assignment's context."
+    : "These are student questions across all assignments in the course.";
+
   const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
         content: `You are an educational analytics assistant. Analyze these student questions sent to Pascal, a course AI assistant. Identify patterns across ALL messages — do not focus on individual students.
+
+${scopeNote}
 
 Return a JSON object with exactly this structure:
 {
@@ -94,12 +109,31 @@ Rules:
   }
 
   // Upsert cache
-  await supabase
-    .from("course_insights_cache")
-    .upsert(
-      { course_id: courseId, insights: summary, generated_at: new Date().toISOString() },
-      { onConflict: "course_id" }
-    );
+  const cacheRow: Record<string, unknown> = {
+    course_id: courseId,
+    assignment_id: assignmentId ?? null,
+    insights: summary,
+    generated_at: new Date().toISOString(),
+  };
+
+  // Use raw SQL-style upsert since we have a functional unique index
+  if (cached) {
+    // Update existing row
+    let updateQuery = supabase
+      .from("course_insights_cache")
+      .update({ insights: summary, generated_at: new Date().toISOString() })
+      .eq("course_id", courseId);
+
+    if (assignmentId) {
+      updateQuery = updateQuery.eq("assignment_id", assignmentId);
+    } else {
+      updateQuery = updateQuery.is("assignment_id", null);
+    }
+    await updateQuery;
+  } else {
+    // Insert new row
+    await supabase.from("course_insights_cache").insert(cacheRow);
+  }
 
   return summary;
 }

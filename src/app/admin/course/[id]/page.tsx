@@ -23,6 +23,7 @@ export default function AdminCoursePage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [newAnnouncement, setNewAnnouncement] = useState("");
   const [posting, setPosting] = useState(false);
+  const [insightsAssignment, setInsightsAssignment] = useState<string | null>(null);
 
   // Load course info (for class code)
   useEffect(() => {
@@ -72,16 +73,18 @@ export default function AdminCoursePage() {
       .catch(() => {});
   }, [activeTab, courseId]);
 
-  // Load insights when tab is active
+  // Load insights when tab is active or assignment filter changes
   useEffect(() => {
     if (activeTab !== "insights") return;
-    fetch(`/api/insights?course_id=${courseId}`)
+    const params = new URLSearchParams({ course_id: courseId });
+    if (insightsAssignment) params.set("assignment_id", insightsAssignment);
+    fetch(`/api/insights?${params}`)
       .then((r) => r.json())
       .then((data) => {
         if (data && data.course_id) setInsights(data);
       })
       .catch(() => {});
-  }, [activeTab, courseId]);
+  }, [activeTab, courseId, insightsAssignment]);
 
   const handlePostAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +167,22 @@ export default function AdminCoursePage() {
       {activeTab === "insights" ? (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3 bg-surface border border-border rounded-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <label className="text-xs font-medium text-muted">Filter insights by:</label>
+              <select
+                value={insightsAssignment ?? ""}
+                onChange={(e) => {
+                  setInsightsAssignment(e.target.value || null);
+                  setInsights(null);
+                }}
+                className="border border-border rounded px-3 py-1.5 text-sm bg-background focus:outline-none focus:border-accent"
+              >
+                <option value="">All Assignments</option>
+                {assignments.map((a) => (
+                  <option key={a.id} value={a.id}>{a.title}</option>
+                ))}
+              </select>
+            </div>
             <InsightsPanel insights={insights} />
           </div>
           <div className="lg:col-span-2 lg:sticky lg:top-4 lg:self-start">
