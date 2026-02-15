@@ -96,26 +96,44 @@ export async function POST(req: NextRequest) {
     ? { ...config.policy, ...assignment.overrides }
     : config.policy;
 
-  // Check policy — disallowed artifacts
+  // Check policy — disallowed artifacts & topic gates
+  // Return blocked responses as SSE so the client (which expects streaming) can display them
+  let blockedMessage: string | null = null;
+
   const policyCheck = isDisallowedRequest(message, effectivePolicy);
   if (policyCheck.blocked) {
-    return NextResponse.json({ role: "assistant", content: policyCheck.reason });
+    blockedMessage = policyCheck.reason ?? effectivePolicy.refusal_message;
   }
 
-  // Check policy — topic gates
-  if (effectivePolicy.topic_gates && effectivePolicy.topic_gates.length > 0) {
+  if (!blockedMessage && effectivePolicy.topic_gates && effectivePolicy.topic_gates.length > 0) {
     const lowerMessage = message.toLowerCase();
     for (const gate of effectivePolicy.topic_gates) {
       if (lowerMessage.includes(gate.topic.toLowerCase())) {
         const result = checkTopicGate(gate.topic, effectivePolicy.topic_gates);
         if (result.gated) {
-          return NextResponse.json({
-            role: "assistant",
-            content: result.gate?.message || effectivePolicy.refusal_message,
-          });
+          blockedMessage = result.gate?.message || effectivePolicy.refusal_message;
+          break;
         }
       }
     }
+  }
+
+  if (blockedMessage) {
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: blockedMessage })}\n\n`));
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      },
+    });
+    return new Response(readable, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   }
 
   // Fetch prior messages for context
