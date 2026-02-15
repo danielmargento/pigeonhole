@@ -142,7 +142,6 @@ export interface ConceptCheckPayload {
 export interface LLMInsightSummary {
   top_topics: { topic: string; count: number }[];
   misconceptions: { topic: string; description: string; sample_questions: string[] }[];
-  lecture_emphasis: { lecture: string; reason: string }[];
   generated_at: string;
 }
 

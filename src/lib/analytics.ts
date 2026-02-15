@@ -73,16 +73,12 @@ Return a JSON object with exactly this structure:
       "description": "what students get wrong",
       "sample_questions": ["actual student question 1", "actual student question 2"]
     }
-  ],
-  "lecture_emphasis": [
-    {"lecture": "specific lecture/topic name", "reason": "specific subtopics or concepts within this lecture students struggle with"}
   ]
 }
 
 Rules:
 - top_topics: exactly 5 items — the most discussed conceptual topics across all messages. Only include real academic concepts (e.g. "Recursion", "Big-O Notation", "Linked Lists"). EXCLUDE generic references like "homework question 2", "problem 3", "assignment help", etc. "count" is your estimate of how many messages relate to that topic.
 - misconceptions: max 5 items — concepts students commonly misunderstand. For each, include 1-3 REAL sample questions from the messages. Each sample question must be substantive and DISTINCT from the others — do NOT include two questions that ask essentially the same thing. Pick questions that show different angles of the misconception.
-- lecture_emphasis: max 5 items — lectures or topics needing more emphasis. Be SPECIFIC about which subtopics or concepts within the lecture students struggle with. Instead of "Sorting Algorithms", say "Sorting Algorithms — merge sort recurrence relations and partitioning in quicksort". The "reason" should describe the specific conceptual gaps students show.
 - Be specific and actionable — a teacher should be able to use these to adjust their teaching
 - Return ONLY valid JSON, no markdown fences`,
       },
@@ -101,7 +97,6 @@ Rules:
     summary = {
       top_topics: parsed.top_topics ?? [],
       misconceptions: parsed.misconceptions ?? [],
-      lecture_emphasis: parsed.lecture_emphasis ?? [],
       generated_at: new Date().toISOString(),
     };
   } catch {

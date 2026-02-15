@@ -202,21 +202,6 @@ export default function InsightsPanel({ insights }: Props) {
         </div>
       )}
 
-      {/* Lectures Needing Emphasis */}
-      {llm?.lecture_emphasis && llm.lecture_emphasis.length > 0 && (
-        <div className="bg-background border border-border rounded-lg p-4">
-          <h4 className="text-xs font-semibold text-muted mb-3">Lectures Needing Emphasis</h4>
-          <div className="space-y-2.5">
-            {llm.lecture_emphasis.map((l, i) => (
-              <div key={i}>
-                <p className="text-sm font-medium text-foreground">{l.lecture}</p>
-                <p className="text-xs text-muted mt-0.5">{l.reason}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {!llm && (
         <div className="bg-background border border-border rounded-lg p-4 text-center">
           <p className="text-xs text-muted">
