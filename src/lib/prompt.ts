@@ -265,24 +265,28 @@ ${assignment.staff_notes}`);
   // ── Concept Check Instructions ──
   if (conceptChecksEnabled) {
     sections.push(`
-## Concept Check Questions
-You should periodically test the student's understanding by embedding a concept check question in your response. Follow these rules:
+## Concept Check Questions — MANDATORY
+You MUST include a concept check question in EVERY response where you explain, clarify, or teach a concept. This is not optional. If your response contains any educational content, it MUST end with a concept check.
 
-1. **When to include a concept check:** After at least 1 back-and-forth exchange on a topic. Aim for roughly every 2-3 assistant messages whenever you have explained or discussed a concept worth testing. Be proactive — if you taught something, quiz on it.
+The ONLY exceptions (when you may skip the concept check):
+- The very first greeting/introduction message
+- Purely logistical responses (e.g. "Office hours are Tuesdays at 3pm")
+- Very short clarifying questions back to the student (e.g. "Which problem are you working on?")
 
-2. **Format:** When you include a concept check, add it at the END of your regular response, separated by a blank line. Use this exact format:
+**Format:** Add the concept check at the END of your response, after a blank line. Use this exact format:
 
 [CONCEPT_CHECK]{"question":"Your question here","options":["A) First option","B) Second option","C) Third option","D) Fourth option"],"correct":0,"explanation":"Brief explanation of why the correct answer is right."}[/CONCEPT_CHECK]
 
-3. **Rules:**
-   - The question should directly relate to what was just discussed.
-   - Difficulty should match the level of the course materials and assignment.
-   - Always provide exactly 4 options.
-   - The "correct" field is the zero-based index of the correct option.
-   - The "explanation" should be 1-2 sentences explaining why the answer is correct. **Always cite the specific course material** (by name, e.g. "See **Lecture 3: Sorting Algorithms** for more on this") so the student knows where to study further.
-   - Keep the question concise and focused on one concept.
-   - Do NOT reference the concept check in your regular response text. Just include the tag block at the end.
-   - Never include more than one concept check per message.`);
+**Rules:**
+- The question MUST directly relate to what was just discussed.
+- Difficulty should match the level of the course materials and assignment.
+- Always provide exactly 4 options.
+- The "correct" field is the zero-based index of the correct option.
+- The "explanation" field MUST be plain text only — no markdown, no asterisks, no bold, no italics. Just plain sentences. Cite course materials by name naturally (e.g. "See Lecture 3: Sorting Algorithms for more on this").
+- Keep the question concise and focused on one concept.
+- Do NOT reference the concept check in your regular response text. Just include the tag block at the end.
+- Never include more than one concept check per message.
+- If you are unsure whether to include one, INCLUDE IT. Err on the side of always including a concept check.`);
   }
 
   return sections.join("\n");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 interface Props {
   question: string;
@@ -92,7 +93,13 @@ export default function ConceptCheckCard({
             <span className="font-semibold">
               {selected === correctIndex ? "Correct!" : "Not quite."}
             </span>{" "}
-            {explanation}
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => <span>{children}</span>,
+              }}
+            >
+              {explanation}
+            </ReactMarkdown>
           </div>
         )}
       </div>
