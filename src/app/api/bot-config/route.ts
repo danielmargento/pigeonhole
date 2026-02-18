@@ -44,17 +44,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const upsertData: Record<string, unknown> = {
+    course_id: body.course_id,
+  };
+  if (body.style_preset !== undefined) upsertData.style_preset = body.style_preset;
+  if (body.policy !== undefined) upsertData.policy = body.policy;
+  if (body.context !== undefined) upsertData.context = body.context;
+  if (body.general_chat_enabled !== undefined) upsertData.general_chat_enabled = body.general_chat_enabled;
+  if (body.general_chat_material_ids !== undefined) upsertData.general_chat_material_ids = body.general_chat_material_ids;
+
   const { data, error } = await supabase
     .from("bot_configs")
-    .upsert(
-      {
-        course_id: body.course_id,
-        style_preset: body.style_preset,
-        policy: body.policy,
-        context: body.context,
-      },
-      { onConflict: "course_id" }
-    )
+    .upsert(upsertData, { onConflict: "course_id" })
     .select()
     .single();
 

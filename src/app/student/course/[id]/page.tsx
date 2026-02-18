@@ -6,7 +6,7 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import ChatComposer from "@/components/chat/ChatComposer";
 import AssignmentSelect from "@/components/assignments/AssignmentSelect";
 import SavedNotesPanel from "@/components/chat/SavedNotesPanel";
-import { Assignment, Message } from "@/lib/types";
+import { Assignment, BotConfig, Message } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
 import { parseConceptCheck } from "@/lib/conceptCheck";
 
@@ -18,6 +18,8 @@ export default function StudentCoursePage() {
 
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null);
+  const [generalChatEnabled, setGeneralChatEnabled] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
   const sessionIdRef = useRef<string | null>(resumeSessionId);
@@ -37,6 +39,27 @@ export default function StudentCoursePage() {
       .then(setAssignments)
       .catch(() => {});
   }, [courseId]);
+
+  // Load bot config (for general chat gating)
+  useEffect(() => {
+    fetch(`/api/bot-config?course_id=${courseId}`)
+      .then((r) => r.json())
+      .then((data: BotConfig | null) => {
+        if (data && data.course_id) {
+          setGeneralChatEnabled(data.general_chat_enabled ?? false);
+        }
+        setConfigLoaded(true);
+      })
+      .catch(() => setConfigLoaded(true));
+  }, [courseId]);
+
+  // Auto-select first assignment when general chat is off
+  useEffect(() => {
+    if (!configLoaded || resumeSessionId) return;
+    if (!generalChatEnabled && !selectedAssignment && assignments.length > 0) {
+      setSelectedAssignment(assignments[0].id);
+    }
+  }, [configLoaded, generalChatEnabled, assignments, selectedAssignment, resumeSessionId]);
 
   // If resuming a session, load its messages
   useEffect(() => {
@@ -309,14 +332,14 @@ export default function StudentCoursePage() {
 
   if (userLoading) {
     return (
-      <div className="max-w-4xl mx-auto flex items-center justify-center h-[calc(100vh-120px)]">
+      <div className="max-w-5xl mx-auto flex items-center justify-center h-[calc(100vh-120px)]">
         <p className="text-muted text-sm">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-120px)]">
+    <div className="max-w-5xl mx-auto flex flex-col h-[calc(100vh-120px)]">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           {activeTab === "chat" && (
@@ -325,6 +348,7 @@ export default function StudentCoursePage() {
                 assignments={assignments}
                 selected={selectedAssignment}
                 onSelect={setSelectedAssignment}
+                generalChatEnabled={generalChatEnabled}
               />
               <label className="flex items-center gap-1.5 text-xs text-muted cursor-pointer select-none">
                 <input

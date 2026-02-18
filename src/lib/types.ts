@@ -25,7 +25,17 @@ export interface Assignment {
   due_date: string | null;
   overrides: Partial<PolicyConfig> | null;
   material_ids: string[];
+  anchor_material_id: string | null;
+  question_hints: { question: string; hint: string }[];
+  annotations: PdfAnnotation[];
   created_at: string;
+}
+
+export interface PdfAnnotation {
+  material_id: string;
+  page: number;
+  selected_text: string;
+  hint: string;
 }
 
 export interface CourseMaterial {
@@ -66,6 +76,8 @@ export interface BotConfig {
   style_preset: StylePreset;
   policy: PolicyConfig;
   context: string;
+  general_chat_enabled: boolean;
+  general_chat_material_ids: string[];
   created_at: string;
   updated_at: string;
 }

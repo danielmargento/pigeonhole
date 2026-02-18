@@ -8,7 +8,7 @@ import AssignmentEditor from "@/components/admin/AssignmentEditor";
 import InsightsPanel from "@/components/admin/InsightsPanel";
 import InstructorChatPanel from "@/components/admin/InstructorChatPanel";
 import RosterPanel from "@/components/admin/RosterPanel";
-import { Announcement, Assignment, CourseMaterial, UsageInsight } from "@/lib/types";
+import { Announcement, Assignment, BotConfig, CourseMaterial, UsageInsight } from "@/lib/types";
 
 type Tab = "materials" | "assignments" | "announcements" | "roster" | "insights";
 
@@ -24,6 +24,11 @@ export default function AdminCoursePage() {
   const [newAnnouncement, setNewAnnouncement] = useState("");
   const [posting, setPosting] = useState(false);
   const [insightsAssignment, setInsightsAssignment] = useState<string | null>(null);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [botConfig, setBotConfig] = useState<BotConfig | null>(null);
+  const [generalChatEnabled, setGeneralChatEnabled] = useState(false);
+  const [generalChatMaterialIds, setGeneralChatMaterialIds] = useState<string[]>([]);
+  const [savingGeneralChat, setSavingGeneralChat] = useState(false);
 
   // Load course info (for class code)
   useEffect(() => {
@@ -37,9 +42,18 @@ export default function AdminCoursePage() {
       .catch(() => {});
   }, [courseId]);
 
-  // Load bot config on mount (still needed as fallback for general chat)
+  // Load bot config on mount
   useEffect(() => {
-    fetch(`/api/bot-config?course_id=${courseId}`).catch(() => {});
+    fetch(`/api/bot-config?course_id=${courseId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.course_id) {
+          setBotConfig(data);
+          setGeneralChatEnabled(data.general_chat_enabled ?? false);
+          setGeneralChatMaterialIds(data.general_chat_material_ids ?? []);
+        }
+      })
+      .catch(() => {});
   }, [courseId]);
 
   // Load assignments
@@ -120,7 +134,7 @@ export default function AdminCoursePage() {
   ];
 
   return (
-    <div className={activeTab === "insights" ? "max-w-7xl mx-auto" : "max-w-4xl mx-auto"}>
+    <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-foreground">Course Configuration</h1>
@@ -200,6 +214,86 @@ export default function AdminCoursePage() {
           )}
           {activeTab === "assignments" && (
             <div className="space-y-6">
+              {/* ── General Chat Config ── */}
+              <div className="p-4 bg-background border border-border rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-foreground">General Chat</h3>
+                    <p className="text-[11px] text-muted mt-0.5">
+                      When enabled, students can chat without selecting an assignment. Only the materials you choose below will be available.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={generalChatEnabled}
+                      onChange={(e) => setGeneralChatEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                  </label>
+                </div>
+                {generalChatEnabled && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted block">
+                      Materials available in general chat:
+                    </label>
+                    <div className="border border-border rounded-lg bg-surface divide-y divide-border max-h-40 overflow-y-auto">
+                      {materials.map((m) => (
+                        <label key={m.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-accent-light/30">
+                          <input
+                            type="checkbox"
+                            checked={generalChatMaterialIds.includes(m.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setGeneralChatMaterialIds((prev) => [...prev, m.id]);
+                              } else {
+                                setGeneralChatMaterialIds((prev) => prev.filter((id) => id !== m.id));
+                              }
+                            }}
+                            className="accent-accent"
+                          />
+                          <span className="truncate text-foreground">{m.file_name}</span>
+                          <span className="text-[10px] text-muted ml-auto shrink-0">{m.category}</span>
+                        </label>
+                      ))}
+                      {materials.length === 0 && (
+                        <p className="px-3 py-2 text-xs text-muted">Upload materials first in the Materials tab.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  disabled={savingGeneralChat}
+                  onClick={async () => {
+                    setSavingGeneralChat(true);
+                    try {
+                      const res = await fetch("/api/bot-config", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          course_id: courseId,
+                          general_chat_enabled: generalChatEnabled,
+                          general_chat_material_ids: generalChatEnabled ? generalChatMaterialIds : [],
+                        }),
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        setBotConfig(data);
+                      }
+                    } finally {
+                      setSavingGeneralChat(false);
+                    }
+                  }}
+                  className="bg-accent text-white px-4 py-1.5 rounded-lg text-xs font-medium hover:bg-accent-hover transition-colors disabled:opacity-50"
+                >
+                  {savingGeneralChat ? "Saving..." : "Save General Chat Settings"}
+                </button>
+              </div>
+
+              <hr className="border-border" />
+
               {assignments.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-foreground">Existing Assignments</h3>
@@ -277,26 +371,37 @@ export default function AdminCoursePage() {
                   <hr className="border-border" />
                 </div>
               )}
-              <div>
-                <h3 className="text-sm font-medium text-foreground mb-3">New Assignment</h3>
-                <AssignmentEditor
-                  materials={materials}
-                  onSave={async (a: AssignmentPayload) => {
-                    const res = await fetch("/api/assignments", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ ...a, course_id: courseId }),
-                    });
-                    if (!res.ok) {
-                      const err = await res.json().catch(() => ({}));
-                      alert(`Failed to create assignment: ${err.error || "Unknown error"}`);
-                      return;
-                    }
-                    const created = await res.json();
-                    setAssignments((prev) => [created, ...prev]);
-                  }}
-                />
-              </div>
+              {showNewForm ? (
+                <div>
+                  <h3 className="text-sm font-medium text-foreground mb-3">New Assignment</h3>
+                  <AssignmentEditor
+                    materials={materials}
+                    onSave={async (a: AssignmentPayload) => {
+                      const res = await fetch("/api/assignments", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...a, course_id: courseId }),
+                      });
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        alert(`Failed to create assignment: ${err.error || "Unknown error"}`);
+                        return;
+                      }
+                      const created = await res.json();
+                      setAssignments((prev) => [created, ...prev]);
+                      setShowNewForm(false);
+                    }}
+                    onCancel={() => setShowNewForm(false)}
+                  />
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowNewForm(true)}
+                  className="w-full py-3 border-2 border-dashed border-border rounded-lg text-sm font-medium text-muted hover:border-accent/50 hover:text-foreground transition-colors"
+                >
+                  + New Assignment
+                </button>
+              )}
             </div>
           )}
           {activeTab === "announcements" && (

@@ -84,6 +84,9 @@ export async function PATCH(req: NextRequest) {
   if (body.due_date !== undefined) updates.due_date = body.due_date;
   if (body.overrides !== undefined) updates.overrides = body.overrides;
   if (body.material_ids !== undefined) updates.material_ids = body.material_ids;
+  if (body.question_hints !== undefined) updates.question_hints = body.question_hints;
+  if (body.anchor_material_id !== undefined) updates.anchor_material_id = body.anchor_material_id;
+  if (body.annotations !== undefined) updates.annotations = body.annotations;
 
   const { data, error } = await supabase
     .from("assignments")
@@ -125,6 +128,9 @@ export async function POST(req: NextRequest) {
       due_date: body.due_date ?? null,
       overrides: body.overrides ?? null,
       material_ids: body.material_ids ?? [],
+      question_hints: body.question_hints ?? [],
+      anchor_material_id: body.anchor_material_id ?? null,
+      annotations: body.annotations ?? [],
     })
     .select()
     .single();
