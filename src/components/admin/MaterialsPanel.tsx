@@ -11,7 +11,7 @@ const CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
-const ACCEPTED_TYPES = ".pdf,.docx,.pptx,.txt,.md";
+const ACCEPTED_TYPES = ".pdf,.txt,.md";
 
 interface Props {
   courseId: string;
@@ -151,7 +151,7 @@ export default function MaterialsPanel({ courseId, materials, onMaterialsChange 
                 Drop files here or click to upload
               </p>
               <p className="text-xs text-muted mt-1">
-                PDF, DOCX, PPTX, TXT, MD
+                PDF, TXT, MD
               </p>
             </>
           )}

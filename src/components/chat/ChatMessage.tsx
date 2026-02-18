@@ -9,6 +9,7 @@ import { Message } from "@/lib/types";
 import SaveToggle from "./SaveToggle";
 import ConceptCheckCard from "./ConceptCheckCard";
 import { parseConceptCheck, hasPartialConceptCheck } from "@/lib/conceptCheck";
+import { parseSourceLinks, hasPartialSourceTag } from "@/lib/sourceLink";
 
 /** Convert \( ... \) → $...$ and \[ ... \] → $$...$$ so remark-math can parse them */
 function normalizeLatex(text: string): string {
@@ -49,9 +50,20 @@ export default function ChatMessage({
 
   // Hide partial concept check tags during streaming
   const isPartial = !isUser && hasPartialConceptCheck(message.content);
-  const displayContent = isPartial
+  let displayContent = isPartial
     ? message.content.replace(/\[CONCEPT_CHECK\][\s\S]*$/, "").trim()
     : cleanContent;
+
+  // Parse source links — convert [SOURCE:...] tags to markdown links
+  if (!isUser) {
+    if (hasPartialSourceTag(displayContent)) {
+      // Hide incomplete source tag during streaming
+      displayContent = displayContent.replace(/\[SOURCE:[^\]]*$/, "").trim();
+    } else {
+      const { cleanContent: withLinks } = parseSourceLinks(displayContent);
+      displayContent = withLinks;
+    }
+  }
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -70,6 +82,27 @@ export default function ChatMessage({
               <ReactMarkdown
                 remarkPlugins={[remarkMath, remarkGfm]}
                 rehypePlugins={[rehypeKatex]}
+                components={{
+                  a: ({ href, children, ...props }) => {
+                    const isSourceLink = href?.startsWith("/api/materials/view");
+                    return (
+                      <a
+                        href={href}
+                        target={isSourceLink ? "_blank" : undefined}
+                        rel={isSourceLink ? "noopener noreferrer" : undefined}
+                        className={isSourceLink ? "inline-flex items-center gap-0.5 text-accent hover:underline" : undefined}
+                        {...props}
+                      >
+                        {isSourceLink && (
+                          <svg className="inline w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                        {children}
+                      </a>
+                    );
+                  },
+                }}
               >
                 {normalizeLatex(displayContent)}
               </ReactMarkdown>

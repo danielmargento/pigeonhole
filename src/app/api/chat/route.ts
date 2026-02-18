@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createServerClient } from "@/lib/supabaseServer";
-import { buildSystemPrompt } from "@/lib/prompt";
+import { buildSystemPrompt, buildSystemPromptWithChunks } from "@/lib/prompt";
 import { isDisallowedRequest, checkTopicGate } from "@/lib/policy";
-import { Course, BotConfig, Assignment, CourseMaterial, Message } from "@/lib/types";
+import { generateQueryEmbedding } from "@/lib/embeddings";
+import { Course, BotConfig, Assignment, CourseMaterial, Message, RetrievedChunk } from "@/lib/types";
 
 function getOpenAI() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
@@ -148,7 +149,41 @@ export async function POST(req: NextRequest) {
     ...config,
     policy: effectivePolicy,
   };
-  const systemPrompt = buildSystemPrompt(course, effectiveConfig, assignment, materials, conceptChecksEnabled);
+
+  // Try RAG vector search, fall back to full-text injection
+  let systemPrompt: string;
+  let retrievedChunks: RetrievedChunk[] = [];
+  try {
+    const queryEmbedding = await generateQueryEmbedding(message);
+    const materialIds = assignment?.material_ids?.length ? assignment.material_ids : null;
+    const { data: chunks, error: rpcError } = await supabase.rpc("match_chunks", {
+      query_embedding: JSON.stringify(queryEmbedding),
+      match_threshold: 0.3,
+      match_count: 8,
+      p_course_id: course_id,
+      p_material_ids: materialIds,
+    });
+
+    if (rpcError) throw rpcError;
+
+    if (chunks && chunks.length > 0) {
+      retrievedChunks = chunks as RetrievedChunk[];
+      console.log("[chat] RAG: retrieved", retrievedChunks.length, "chunks");
+      systemPrompt = buildSystemPromptWithChunks(
+        course,
+        effectiveConfig,
+        retrievedChunks,
+        assignment,
+        conceptChecksEnabled
+      );
+    } else {
+      console.log("[chat] RAG: no chunks matched, falling back to full text");
+      systemPrompt = buildSystemPrompt(course, effectiveConfig, assignment, materials, conceptChecksEnabled);
+    }
+  } catch (ragError) {
+    console.error("[chat] RAG search failed, falling back to full text:", ragError);
+    systemPrompt = buildSystemPrompt(course, effectiveConfig, assignment, materials, conceptChecksEnabled);
+  }
 
   const chatMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -174,6 +209,18 @@ export async function POST(req: NextRequest) {
         if (text) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
         }
+      }
+      // Emit retrieved sources metadata before DONE
+      if (retrievedChunks.length > 0) {
+        const sources = retrievedChunks.map((c) => ({
+          material_id: c.material_id,
+          file_name: c.file_name,
+          source_label: c.source_label,
+          similarity: c.similarity,
+        }));
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ sources })}\n\n`)
+        );
       }
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       controller.close();

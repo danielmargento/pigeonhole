@@ -248,12 +248,15 @@ export default function StudentCoursePage() {
             if (data === "[DONE]") break;
             try {
               const parsed = JSON.parse(data);
-              assistantText += parsed.text;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === placeholderId ? { ...m, content: assistantText } : m
-                )
-              );
+              if (parsed.text) {
+                assistantText += parsed.text;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === placeholderId ? { ...m, content: assistantText } : m
+                  )
+                );
+              }
+              // parsed.sources is emitted for metadata; inline [SOURCE] tags handle rendering
             } catch {
               // skip parse errors
             }

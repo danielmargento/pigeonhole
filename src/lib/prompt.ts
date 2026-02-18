@@ -1,4 +1,4 @@
-import { Assignment, BotConfig, Course, CourseMaterial } from "./types";
+import { Assignment, BotConfig, Course, CourseMaterial, RetrievedChunk } from "./types";
 
 /**
  * Builds the system prompt sent to the LLM.
@@ -286,4 +286,66 @@ You should periodically test the student's understanding by embedding a concept 
   }
 
   return sections.join("\n");
+}
+
+/**
+ * Builds the system prompt using retrieved RAG chunks instead of full material text.
+ * Identical to buildSystemPrompt() except the Course Materials section uses
+ * only the retrieved passages with precise source citations.
+ */
+export function buildSystemPromptWithChunks(
+  course: Course,
+  config: BotConfig,
+  chunks: RetrievedChunk[],
+  assignment?: Assignment | null,
+  conceptChecksEnabled: boolean = false
+): string {
+  // Build the full prompt with no materials, then inject chunk section
+  const basePrompt = buildSystemPrompt(course, config, assignment, undefined, conceptChecksEnabled);
+
+  if (chunks.length === 0) return basePrompt;
+
+  // Group chunks by file, sorted by chunk_index within each file
+  const byFile = new Map<string, RetrievedChunk[]>();
+  for (const chunk of chunks) {
+    const key = `${chunk.material_id}`;
+    if (!byFile.has(key)) byFile.set(key, []);
+    byFile.get(key)!.push(chunk);
+  }
+
+  const materialLines: string[] = [
+    "\n## Course Materials (Retrieved Passages)",
+    "The following passages were retrieved as most relevant to the student's question.",
+    "- **Quote the exact text** when presenting definitions, equations, or key descriptions. Use blockquotes (>) for direct quotes so the student can see the original wording.",
+    "- When a passage contains an equation or formula, reproduce it exactly using LaTeX and cite the page/slide it came from.",
+    "- If the student is missing a key concept, quote the relevant passage and page number so they can find it in the original material.",
+    "- If you need information not in these passages, say so explicitly.",
+    "",
+    "### Citing Sources",
+    "When citing a source, use this exact format so the student can click through to the original material:",
+    "  [SOURCE:material_id:source_label]display text[/SOURCE]",
+    "",
+    "Examples:",
+    '  See [SOURCE:abc-123:Page 5]Page 5 of textbook.pdf[/SOURCE] for the full derivation.',
+    '  As described in [SOURCE:def-456:Part 2]Part 2 of notes.txt[/SOURCE], the algorithm runs in O(n log n).',
+    "",
+    "Rules:",
+    "- Use the material_id and source_label exactly as shown in the passage headers below.",
+    "- The display text should be human-readable (e.g. \"Page 5 of textbook.pdf\").",
+    "- Always cite the specific passage you are referencing.\n",
+  ];
+
+  for (const [, fileChunks] of byFile) {
+    const sorted = fileChunks.sort((a, b) => a.chunk_index - b.chunk_index);
+    const first = sorted[0];
+    const prefix = first.category ? `[${first.category}] ` : "";
+    materialLines.push(`### ${prefix}${first.file_name} (material_id: ${first.material_id})`);
+    for (const chunk of sorted) {
+      materialLines.push(`[${chunk.source_label}]`);
+      materialLines.push(chunk.content);
+      materialLines.push("");
+    }
+  }
+
+  return basePrompt + "\n" + materialLines.join("\n");
 }
